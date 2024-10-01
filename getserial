@@ -1,6 +1,6 @@
 ---
 - name: Gather serial numbers from Cisco devices
-  hosts: cisco_devices
+  hosts: switches
   gather_facts: no
   vars:
     ios_commands:
