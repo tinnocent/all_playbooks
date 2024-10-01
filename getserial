@@ -1,0 +1,31 @@
+---
+- name: Gather serial numbers from Cisco devices
+  hosts: cisco_devices
+  gather_facts: no
+  vars:
+    ios_commands:
+      - "show version | include System serial number"
+    nxos_commands:
+      - "show version | include Chassis"
+  tasks:
+    - name: Gather serial number from Cisco IOS devices
+      when: ansible_network_os == "ios"
+      cisco.ios.ios_command:
+        commands: "{{ ios_commands }}"
+      register: ios_serial
+
+    - name: Gather serial number from Cisco NXOS devices
+      when: ansible_network_os == "nxos"
+      cisco.nxos.nxos_command:
+        commands: "{{ nxos_commands }}"
+      register: nxos_serial
+
+    - name: Display serial number from Cisco IOS devices
+      when: ios_serial is defined
+      debug:
+        msg: "Cisco IOS device serial number: {{ ios_serial.stdout }}"
+
+    - name: Display serial number from Cisco NXOS devices
+      when: nxos_serial is defined
+      debug:
+        msg: "Cisco NXOS device serial number: {{ nxos_serial.stdout }}"
