@@ -26,3 +26,17 @@
 "235SwMgmtNew04" ansible_host=172.30.14.138
 "235SwMgmtNew05" ansible_host=172.30.14.139
 "235SwEdge01" ansible_host=172.30.14.150
+"250SwBgw01" ansible_host=10.64.170.51
+"250SwBgw02" ansible_host=10.64.170.52
+"250SwLeaf01" ansible_host=10.64.170.101
+"250SwLeaf02" ansible_host=10.64.170.102
+"250SwLeaf03" ansible_host=10.64.170.103
+"250SwLeaf04" ansible_host=10.64.170.104
+"250SwLeaf05" ansible_host=10.64.170.105
+"250SwLeaf06" ansible_host=10.64.170.106
+"250SwLeaf07" ansible_host=10.64.170.107
+"250SwLeaf08" ansible_host=10.64.170.108
+"250SwLeaf09" ansible_host=10.64.170.109
+"250SwLeaf10" ansible_host=10.64.170.110
+"250SwSpine01" ansible_host=10.64.170.11
+"250SwSpine02" ansible_host=10.64.170.12
