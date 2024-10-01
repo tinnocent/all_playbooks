@@ -1,7 +1,7 @@
 ---
 - name: Gather serial numbers from Cisco devices
   hosts: switches
-  gather_facts: yes  # We will gather facts to detect the OS type
+  gather_facts: yes  # Gather facts to detect the OS
   vars:
     ios_commands:
       - "show version | include System serial number"
