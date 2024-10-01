@@ -1,36 +1,32 @@
 ---
 - name: Gather serial numbers from Cisco devices
   hosts: switches
-  gather_facts: yes  # Gather facts to detect the OS
+  gather_facts: no
+  connection: ansible.netcommon.network_cli
   vars:
     ios_commands:
       - "show version | include System serial number"
     nxos_commands:
       - "show version | include Chassis"
   tasks:
-    - name: Detect Cisco device OS
-      set_fact:
-        is_ios: "{{ ansible_net_model is search('Cisco IOS') }}"
-        is_nxos: "{{ ansible_net_model is search('Nexus') }}"
-
     - name: Gather serial number from Cisco IOS devices
-      when: is_ios
       cisco.ios.ios_command:
         commands: "{{ ios_commands }}"
       register: ios_serial
+      when: ansible_network_os == "ios"
 
     - name: Gather serial number from Cisco NXOS devices
-      when: is_nxos
       cisco.nxos.nxos_command:
         commands: "{{ nxos_commands }}"
       register: nxos_serial
+      when: ansible_network_os == "nxos"
 
     - name: Display serial number from Cisco IOS devices
-      when: ios_serial is defined
       debug:
         msg: "Cisco IOS device serial number: {{ ios_serial.stdout }}"
+      when: ios_serial is defined
 
     - name: Display serial number from Cisco NXOS devices
-      when: nxos_serial is defined
       debug:
         msg: "Cisco NXOS device serial number: {{ nxos_serial.stdout }}"
+      when: nxos_serial is defined
