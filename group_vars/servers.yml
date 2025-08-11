@@ -4,3 +4,17 @@ ansible_connection: winrm
 ansible_winrm_transport: ntlm
 ansible_winrm_server_cert_validation: ignore
 ansible_port: 5985
+
+# Authentication - Choose one of these methods:
+
+# Method 1: Plain text (not recommended for production)
+ansible_user: DOMAIN\username  # or just 'Administrator' for local accounts
+ansible_password: your_password_here
+
+# Method 2: Using Ansible Vault (recommended)
+# ansible_user: "{{ vault_ansible_user }}"
+# ansible_password: "{{ vault_ansible_password }}"
+
+# Method 3: Using environment variables
+# ansible_user: "{{ lookup('env', 'ANSIBLE_USER') }}"
+# ansible_password: "{{ lookup('env', 'ANSIBLE_PASSWORD') }}"
