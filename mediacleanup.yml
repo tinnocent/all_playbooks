@@ -1,0 +1,142 @@
+---
+- name: Clean up old media files on Windows servers
+  hosts: 
+    - 250SrvAltCoDel1
+    - 250SrvAltCoDel2
+  gather_facts: no
+  
+  # Windows connection settings
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
+    
+  tasks:
+    - name: Create cleanup script
+      win_copy:
+        content: |
+          # PowerShell cleanup script
+          $logFile = "C:\Logs\cleanup_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+          New-Item -Path "C:\Logs" -ItemType Directory -Force | Out-Null
+          
+          function Remove-OldFiles {
+              param(
+                  [string]$Path,
+                  [string]$Pattern,
+                  [int]$Days
+              )
+              
+              if (Test-Path $Path) {
+                  $cutoffDate = (Get-Date).AddDays(-$Days)
+                  $files = Get-ChildItem -Path $Path -Filter $Pattern -File -ErrorAction SilentlyContinue | 
+                           Where-Object { $_.LastWriteTime -lt $cutoffDate }
+                  
+                  $count = 0
+                  foreach ($file in $files) {
+                      try {
+                          Remove-Item $file.FullName -Force
+                          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Deleted: $($file.FullName)" | Out-File -Append $logFile
+                          $count++
+                      }
+                      catch {
+                          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Error deleting: $($file.FullName) - $_" | Out-File -Append $logFile
+                      }
+                  }
+                  if ($count -gt 0) {
+                      Write-Host "Removed $count files from $Path matching $Pattern older than $Days days"
+                  }
+              } else {
+                  "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Path not found: $Path" | Out-File -Append $logFile
+              }
+          }
+          
+          Write-Host "Starting cleanup on $env:COMPUTERNAME"
+          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Starting cleanup on $env:COMPUTERNAME" | Out-File -Append $logFile
+          
+          # AberdeenSD - 4 days
+          Remove-OldFiles -Path "S:\Webspots\AberdeenSD" -Pattern "*.mpg" -Days 4
+          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\HD 720P" -Pattern "*.mpg" -Days 4
+          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\HD 1080i" -Pattern "*.mpg" -Days 4
+          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\SD" -Pattern "*.mpg" -Days 4
+          
+          # ExtremeReach - 2 days for mpg/xml, 10 days for BB
+          Remove-OldFiles -Path "S:\ExtremeReach\1080" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\1080" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\1080BB" -Pattern "*.mov" -Days 10
+          Remove-OldFiles -Path "S:\ExtremeReach\720" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\720" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\720BB" -Pattern "*.mov" -Days 10
+          Remove-OldFiles -Path "S:\ExtremeReach\SD" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\SD" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\ExtremeReach\SDBB" -Pattern "*.mpg" -Days 10
+          
+          # Javelin - 2 days
+          Remove-OldFiles -Path "S:\Javelin\720p" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\Javelin\720p" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\Javelin\1080i" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\Javelin\1080i" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\Javelin\SD" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\Javelin\SD" -Pattern "*.xml" -Days 2
+          
+          # OTS - 2 days
+          Remove-OldFiles -Path "S:\OTS\SD" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\OTS\SD" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\OTS\720p" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\OTS\720p" -Pattern "*.xml" -Days 2
+          Remove-OldFiles -Path "S:\OTS\1080i" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\OTS\1080i" -Pattern "*.xml" -Days 2
+          
+          # NewsWatch - 4 days
+          Remove-OldFiles -Path "S:\NewsWatch\SD" -Pattern "*.mov" -Days 4
+          Remove-OldFiles -Path "S:\NewsWatch\720p" -Pattern "*.mov" -Days 4
+          
+          # Prod_CreditsAndBillboards - 3 days
+          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\720p_BB" -Pattern "*.mov" -Days 3
+          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\1080i_BB" -Pattern "*.mov" -Days 3
+          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\720p_Credits" -Pattern "*.mov" -Days 3
+          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\1080i_Credits" -Pattern "*.mov" -Days 3
+          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\SD_Credits" -Pattern "*.mov" -Days 3
+          
+          # Police_Patrol - 2 days
+          Remove-OldFiles -Path "S:\Police_Patrol" -Pattern "*.mpg" -Days 2
+          Remove-OldFiles -Path "S:\Police_Patrol" -Pattern "*.mxf" -Days 2
+          
+          Write-Host "Cleanup completed on $env:COMPUTERNAME"
+          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Cleanup script completed on $env:COMPUTERNAME" | Out-File -Append $logFile
+        dest: 'C:\Scripts\media_cleanup.ps1'
+      register: script_copy
+
+    - name: Ensure Scripts directory exists
+      win_file:
+        path: 'C:\Scripts'
+        state: directory
+
+    - name: Execute cleanup script
+      win_shell: |
+        powershell.exe -ExecutionPolicy Bypass -File C:\Scripts\media_cleanup.ps1
+      register: cleanup_result
+
+    - name: Display cleanup output
+      debug:
+        msg: "{{ cleanup_result.stdout_lines }}"
+      when: cleanup_result.stdout_lines is defined
+
+    - name: Check if log file was created
+      win_stat:
+        path: 'C:\Logs'
+      register: log_dir
+
+    - name: Get latest log file content
+      win_shell: |
+        Get-ChildItem -Path C:\Logs -Filter "cleanup_*.log" | 
+        Sort-Object LastWriteTime -Descending | 
+        Select-Object -First 1 | 
+        Get-Content -Tail 20
+      register: log_content
+      when: log_dir.stat.exists
+
+    - name: Display log tail
+      debug:
+        msg: "Latest log entries:\n{{ log_content.stdout }}"
+      when: log_content.stdout is defined
