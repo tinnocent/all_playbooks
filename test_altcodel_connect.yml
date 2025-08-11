@@ -1,0 +1,32 @@
+---
+- name: Test Windows connectivity
+  hosts:
+    - 250SrvAltCoDel1
+    - 250SrvAltCoDel2
+  gather_facts: no
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
+
+  tasks:
+    - name: Test connection
+      win_ping:
+      
+    - name: Get hostname
+      win_shell: hostname
+      register: hostname_result
+      
+    - name: Display hostname
+      debug:
+        msg: "Connected to: {{ hostname_result.stdout }}"
+        
+    - name: Check S: drive
+      win_stat:
+        path: S:\
+      register: s_drive
+      
+    - name: Display S: drive status
+      debug:
+        msg: "S: drive exists: {{ s_drive.stat.exists }}"
