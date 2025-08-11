@@ -40,3 +40,6 @@
 "250SwLeaf10" ansible_host=10.64.170.110
 "250SwSpine01" ansible_host=10.64.170.11
 "250SwSpine02" ansible_host=10.64.170.12
+
+[servers]
+"250SrvAltCoDel1" ansible_host=10.235.196.77
