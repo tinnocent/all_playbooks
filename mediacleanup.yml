@@ -1,18 +1,16 @@
 ---
 - name: Clean up old media files on Windows servers
-  hosts: 
-    - 250SrvAltCoDel1
-    - 250SrvAltCoDel2
+  hosts: 250SrvAltCoDel1  # Only run on AltComDel1
   gather_facts: no
     
   tasks:
-    # STEP 1: Create the directory FIRST (before copying files!)
+    # STEP 1: Create the directory FIRST
     - name: Ensure Scripts directory exists
       win_file:
         path: 'C:\Scripts'
         state: directory
 
-    # STEP 2: Now copy the script (directory exists now)
+    # STEP 2: Copy the cleanup script
     - name: Create cleanup script
       win_copy:
         content: |
