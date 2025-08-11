@@ -4,25 +4,15 @@
     - 250SrvAltCoDel1
     - 250SrvAltCoDel2
   gather_facts: no
-  
-  # Windows connection settings
-  vars:
-    ansible_connection: winrm
-    ansible_winrm_transport: ntlm
-    ansible_winrm_server_cert_validation: ignore
-    ansible_port: 5985
-    # Add authentication credentials here or in inventory/group_vars
-    # ansible_user: "{{ vault_ansible_user }}"
-    # ansible_password: "{{ vault_ansible_password }}"
     
   tasks:
-    # FIRST: Ensure the Scripts directory exists
+    # STEP 1: Create the directory FIRST (before copying files!)
     - name: Ensure Scripts directory exists
       win_file:
         path: 'C:\Scripts'
         state: directory
 
-    # SECOND: Copy the cleanup script
+    # STEP 2: Now copy the script (directory exists now)
     - name: Create cleanup script
       win_copy:
         content: |
@@ -117,16 +107,19 @@
         dest: 'C:\Scripts\media_cleanup.ps1'
       register: script_copy
 
+    # STEP 3: Execute the script
     - name: Execute cleanup script
       win_shell: |
         powershell.exe -ExecutionPolicy Bypass -File C:\Scripts\media_cleanup.ps1
       register: cleanup_result
 
+    # STEP 4: Display output
     - name: Display cleanup output
       debug:
         msg: "{{ cleanup_result.stdout_lines }}"
       when: cleanup_result.stdout_lines is defined
 
+    # STEP 5: Check logs
     - name: Check if log file was created
       win_stat:
         path: 'C:\Logs'
