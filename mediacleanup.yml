@@ -2,6 +2,11 @@
 - name: Clean up old media files on Windows servers
   hosts: 250SrvAltCoDel1  # Only run on AltComDel1
   gather_facts: no
+  vars:
+    ansible_connection: winrm
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+    ansible_port: 5985
     
   tasks:
     # STEP 1: Create the directory FIRST
