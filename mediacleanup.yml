@@ -11,8 +11,18 @@
     ansible_winrm_transport: ntlm
     ansible_winrm_server_cert_validation: ignore
     ansible_port: 5985
+    # Add authentication credentials here or in inventory/group_vars
+    # ansible_user: "{{ vault_ansible_user }}"
+    # ansible_password: "{{ vault_ansible_password }}"
     
   tasks:
+    # FIRST: Ensure the Scripts directory exists
+    - name: Ensure Scripts directory exists
+      win_file:
+        path: 'C:\Scripts'
+        state: directory
+
+    # SECOND: Copy the cleanup script
     - name: Create cleanup script
       win_copy:
         content: |
@@ -106,11 +116,6 @@
           "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Cleanup script completed on $env:COMPUTERNAME" | Out-File -Append $logFile
         dest: 'C:\Scripts\media_cleanup.ps1'
       register: script_copy
-
-    - name: Ensure Scripts directory exists
-      win_file:
-        path: 'C:\Scripts'
-        state: directory
 
     - name: Execute cleanup script
       win_shell: |
