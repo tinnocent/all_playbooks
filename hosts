@@ -43,3 +43,4 @@
 
 [servers]
 "250SrvAltCoDel1" ansible_host=10.235.196.77
+"250SrvAltCoDel2" ansible_host=10.235.196.78
