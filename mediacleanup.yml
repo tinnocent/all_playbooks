@@ -3,7 +3,7 @@
 # Converts batch script to Ansible for Windows hosts
 
 - name: Clean up media storage directories
-  hosts: media_servers
+  hosts: servers
   vars:
     storage_base: "\\\\mnt.250isistor1.aetnglobal.corp\\AltComDelStorage"
     ansible_user: "aetnglobal\\250UsrCommDel"
