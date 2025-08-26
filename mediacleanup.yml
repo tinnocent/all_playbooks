@@ -1,143 +1,485 @@
 ---
-- name: Clean up old media files on Windows servers
-  hosts: 250SrvAltCoDel1  # Only run on AltComDel1
-  gather_facts: no
+# Ansible Playbook for Media Storage Cleanup
+# Converts batch script to Ansible for Windows hosts
+
+- name: Clean up media storage directories
+  hosts: media_servers
   vars:
+    storage_base: "\\\\mnt.250isistor1.aetnglobal.corp\\AltComDelStorage"
+    ansible_user: "aetnglobal\\250UsrCommDel"
+    ansible_password: "250De1ivery!23"
     ansible_connection: winrm
     ansible_winrm_transport: ntlm
     ansible_winrm_server_cert_validation: ignore
     ansible_port: 5985
     
   tasks:
-    # STEP 1: Create the directory FIRST
-    - name: Ensure Scripts directory exists
+    # --- Webspots / AberdeenSD ---
+    - name: Clean Webspots AberdeenSD - MPG files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\Webspots\\AberdeenSD"
+        patterns: "*.mpg"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: aberdeen_base_files
+      ignore_errors: yes
+
+    - name: Remove old AberdeenSD base MPG files
       win_file:
-        path: 'C:\Scripts'
-        state: directory
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ aberdeen_base_files.files | default([]) }}"
+      when: aberdeen_base_files is succeeded
+      ignore_errors: yes
 
-    # STEP 2: Copy the cleanup script
-    - name: Create cleanup script
-      win_copy:
-        content: |
-          # PowerShell cleanup script
-          $logFile = "C:\Logs\cleanup_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-          New-Item -Path "C:\Logs" -ItemType Directory -Force | Out-Null
-          
-          function Remove-OldFiles {
-              param(
-                  [string]$Path,
-                  [string]$Pattern,
-                  [int]$Days
-              )
-              
-              if (Test-Path $Path) {
-                  $cutoffDate = (Get-Date).AddDays(-$Days)
-                  $files = Get-ChildItem -Path $Path -Filter $Pattern -File -ErrorAction SilentlyContinue | 
-                           Where-Object { $_.LastWriteTime -lt $cutoffDate }
-                  
-                  $count = 0
-                  foreach ($file in $files) {
-                      try {
-                          Remove-Item $file.FullName -Force
-                          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Deleted: $($file.FullName)" | Out-File -Append $logFile
-                          $count++
-                      }
-                      catch {
-                          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Error deleting: $($file.FullName) - $_" | Out-File -Append $logFile
-                      }
-                  }
-                  if ($count -gt 0) {
-                      Write-Host "Removed $count files from $Path matching $Pattern older than $Days days"
-                  }
-              } else {
-                  "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Path not found: $Path" | Out-File -Append $logFile
-              }
-          }
-          
-          Write-Host "Starting cleanup on $env:COMPUTERNAME"
-          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Starting cleanup on $env:COMPUTERNAME" | Out-File -Append $logFile
-          
-          # AberdeenSD - 4 days
-          Remove-OldFiles -Path "S:\Webspots\AberdeenSD" -Pattern "*.mpg" -Days 4
-          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\HD 720P" -Pattern "*.mpg" -Days 4
-          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\HD 1080i" -Pattern "*.mpg" -Days 4
-          Remove-OldFiles -Path "S:\Webspots\AberdeenSD\SD" -Pattern "*.mpg" -Days 4
-          
-          # ExtremeReach - 2 days for mpg/xml, 10 days for BB
-          Remove-OldFiles -Path "S:\ExtremeReach\1080" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\1080" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\1080BB" -Pattern "*.mov" -Days 10
-          Remove-OldFiles -Path "S:\ExtremeReach\720" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\720" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\720BB" -Pattern "*.mov" -Days 10
-          Remove-OldFiles -Path "S:\ExtremeReach\SD" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\SD" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\ExtremeReach\SDBB" -Pattern "*.mpg" -Days 10
-          
-          # Javelin - 2 days
-          Remove-OldFiles -Path "S:\Javelin\720p" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\Javelin\720p" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\Javelin\1080i" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\Javelin\1080i" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\Javelin\SD" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\Javelin\SD" -Pattern "*.xml" -Days 2
-          
-          # OTS - 2 days
-          Remove-OldFiles -Path "S:\OTS\SD" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\OTS\SD" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\OTS\720p" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\OTS\720p" -Pattern "*.xml" -Days 2
-          Remove-OldFiles -Path "S:\OTS\1080i" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\OTS\1080i" -Pattern "*.xml" -Days 2
-          
-          # NewsWatch - 4 days
-          Remove-OldFiles -Path "S:\NewsWatch\SD" -Pattern "*.mov" -Days 4
-          Remove-OldFiles -Path "S:\NewsWatch\720p" -Pattern "*.mov" -Days 4
-          
-          # Prod_CreditsAndBillboards - 3 days
-          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\720p_BB" -Pattern "*.mov" -Days 3
-          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\1080i_BB" -Pattern "*.mov" -Days 3
-          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\720p_Credits" -Pattern "*.mov" -Days 3
-          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\1080i_Credits" -Pattern "*.mov" -Days 3
-          Remove-OldFiles -Path "S:\Prod_CreditsAndBillboards\SD_Credits" -Pattern "*.mov" -Days 3
-          
-          # Police_Patrol - 2 days
-          Remove-OldFiles -Path "S:\Police_Patrol" -Pattern "*.mpg" -Days 2
-          Remove-OldFiles -Path "S:\Police_Patrol" -Pattern "*.mxf" -Days 2
-          
-          Write-Host "Cleanup completed on $env:COMPUTERNAME"
-          "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Cleanup script completed on $env:COMPUTERNAME" | Out-File -Append $logFile
-        dest: 'C:\Scripts\media_cleanup.ps1'
-      register: script_copy
+    - name: Clean Webspots AberdeenSD HD 720P - MPG files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\Webspots\\AberdeenSD\\HD 720P"
+        patterns: "*.mpg"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: aberdeen_720p_files
+      ignore_errors: yes
 
-    # STEP 3: Execute the script
-    - name: Execute cleanup script
+    - name: Remove old AberdeenSD HD 720P MPG files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ aberdeen_720p_files.files | default([]) }}"
+      when: aberdeen_720p_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Webspots AberdeenSD HD 1080i - MPG files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\Webspots\\AberdeenSD\\HD 1080i"
+        patterns: "*.mpg"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: aberdeen_1080i_files
+      ignore_errors: yes
+
+    - name: Remove old AberdeenSD HD 1080i MPG files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ aberdeen_1080i_files.files | default([]) }}"
+      when: aberdeen_1080i_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Webspots AberdeenSD SD - MPG files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\Webspots\\AberdeenSD\\SD"
+        patterns: "*.mpg"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: aberdeen_sd_files
+      ignore_errors: yes
+
+    - name: Remove old AberdeenSD SD MPG files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ aberdeen_sd_files.files | default([]) }}"
+      when: aberdeen_sd_files is succeeded
+      ignore_errors: yes
+
+    # --- ExtremeReach ---
+    - name: Clean ExtremeReach 1080 - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\1080"
+        patterns: 
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_1080_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach 1080 files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_1080_files.files | default([]) }}"
+      when: extremereach_1080_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean ExtremeReach 1080BB - MOV files (10 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\1080BB"
+        patterns: "*.mov"
+        age: 10d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_1080bb_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach 1080BB MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_1080bb_files.files | default([]) }}"
+      when: extremereach_1080bb_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean ExtremeReach 720 - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\720"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_720_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach 720 files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_720_files.files | default([]) }}"
+      when: extremereach_720_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean ExtremeReach 720BB - MOV files (10 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\720BB"
+        patterns: "*.mov"
+        age: 10d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_720bb_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach 720BB MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_720bb_files.files | default([]) }}"
+      when: extremereach_720bb_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean ExtremeReach SD - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\SD"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_sd_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach SD files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_sd_files.files | default([]) }}"
+      when: extremereach_sd_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean ExtremeReach SDBB - MPG files (10 days)
+      win_find:
+        paths: "{{ storage_base }}\\ExtremeReach\\SDBB"
+        patterns: "*.mpg"
+        age: 10d
+        recurse: yes
+        age_stamp: mtime
+      register: extremereach_sdbb_files
+      ignore_errors: yes
+
+    - name: Remove old ExtremeReach SDBB MPG files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ extremereach_sdbb_files.files | default([]) }}"
+      when: extremereach_sdbb_files is succeeded
+      ignore_errors: yes
+
+    # --- Javelin ---
+    - name: Clean Javelin 720p - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\Javelin\\720p"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: javelin_720p_files
+      ignore_errors: yes
+
+    - name: Remove old Javelin 720p files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ javelin_720p_files.files | default([]) }}"
+      when: javelin_720p_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Javelin 1080i - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\Javelin\\1080i"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: javelin_1080i_files
+      ignore_errors: yes
+
+    - name: Remove old Javelin 1080i files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ javelin_1080i_files.files | default([]) }}"
+      when: javelin_1080i_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Javelin SD - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\Javelin\\SD"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: javelin_sd_files
+      ignore_errors: yes
+
+    - name: Remove old Javelin SD files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ javelin_sd_files.files | default([]) }}"
+      when: javelin_sd_files is succeeded
+      ignore_errors: yes
+
+    # --- OTS ---
+    - name: Clean OTS SD - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\OTS\\SD"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: ots_sd_files
+      ignore_errors: yes
+
+    - name: Remove old OTS SD files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ ots_sd_files.files | default([]) }}"
+      when: ots_sd_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean OTS 720P - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\OTS\\720P"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: ots_720p_files
+      ignore_errors: yes
+
+    - name: Remove old OTS 720P files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ ots_720p_files.files | default([]) }}"
+      when: ots_720p_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean OTS 1080i - MPG and XML files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\OTS\\1080i"
+        patterns:
+          - "*.mpg"
+          - "*.xml"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: ots_1080i_files
+      ignore_errors: yes
+
+    - name: Remove old OTS 1080i files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ ots_1080i_files.files | default([]) }}"
+      when: ots_1080i_files is succeeded
+      ignore_errors: yes
+
+    # --- NewsWatch ---
+    - name: Clean NewsWatch SD - MOV files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\NewsWatch\\SD"
+        patterns: "*.mov"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: newswatch_sd_files
+      ignore_errors: yes
+
+    - name: Remove old NewsWatch SD MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ newswatch_sd_files.files | default([]) }}"
+      when: newswatch_sd_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean NewsWatch 720p - MOV files (4 days)
+      win_find:
+        paths: "{{ storage_base }}\\NewsWatch\\720p"
+        patterns: "*.mov"
+        age: 4d
+        recurse: yes
+        age_stamp: mtime
+      register: newswatch_720p_files
+      ignore_errors: yes
+
+    - name: Remove old NewsWatch 720p MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ newswatch_720p_files.files | default([]) }}"
+      when: newswatch_720p_files is succeeded
+      ignore_errors: yes
+
+    # --- Prod_CreditsAndBillboards ---
+    - name: Clean Prod_CreditsAndBillboards 720p_BB - MOV files (3 days)
+      win_find:
+        paths: "{{ storage_base }}\\Prod_CreditsAndBillboards\\720p_BB"
+        patterns: "*.mov"
+        age: 3d
+        recurse: yes
+        age_stamp: mtime
+      register: prod_720p_bb_files
+      ignore_errors: yes
+
+    - name: Remove old Prod 720p_BB MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ prod_720p_bb_files.files | default([]) }}"
+      when: prod_720p_bb_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Prod_CreditsAndBillboards 1080i_BB - MOV files (3 days)
+      win_find:
+        paths: "{{ storage_base }}\\Prod_CreditsAndBillboards\\1080i_BB"
+        patterns: "*.mov"
+        age: 3d
+        recurse: yes
+        age_stamp: mtime
+      register: prod_1080i_bb_files
+      ignore_errors: yes
+
+    - name: Remove old Prod 1080i_BB MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ prod_1080i_bb_files.files | default([]) }}"
+      when: prod_1080i_bb_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Prod_CreditsAndBillboards 720p_Credits - MOV files (3 days)
+      win_find:
+        paths: "{{ storage_base }}\\Prod_CreditsAndBillboards\\720p_Credits"
+        patterns: "*.mov"
+        age: 3d
+        recurse: yes
+        age_stamp: mtime
+      register: prod_720p_credits_files
+      ignore_errors: yes
+
+    - name: Remove old Prod 720p_Credits MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ prod_720p_credits_files.files | default([]) }}"
+      when: prod_720p_credits_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Prod_CreditsAndBillboards 1080i_Credits - MOV files (3 days)
+      win_find:
+        paths: "{{ storage_base }}\\Prod_CreditsAndBillboards\\1080i_Credits"
+        patterns: "*.mov"
+        age: 3d
+        recurse: yes
+        age_stamp: mtime
+      register: prod_1080i_credits_files
+      ignore_errors: yes
+
+    - name: Remove old Prod 1080i_Credits MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ prod_1080i_credits_files.files | default([]) }}"
+      when: prod_1080i_credits_files is succeeded
+      ignore_errors: yes
+
+    - name: Clean Prod_CreditsAndBillboards SD_Credits - MOV files (3 days)
+      win_find:
+        paths: "{{ storage_base }}\\Prod_CreditsAndBillboards\\SD_Credits"
+        patterns: "*.mov"
+        age: 3d
+        recurse: yes
+        age_stamp: mtime
+      register: prod_sd_credits_files
+      ignore_errors: yes
+
+    - name: Remove old Prod SD_Credits MOV files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ prod_sd_credits_files.files | default([]) }}"
+      when: prod_sd_credits_files is succeeded
+      ignore_errors: yes
+
+    # --- Police Patrol ---
+    - name: Clean Police_Patrol - MPG and MXF files (2 days)
+      win_find:
+        paths: "{{ storage_base }}\\Police_Patrol"
+        patterns:
+          - "*.mpg"
+          - "*.mxf"
+        age: 2d
+        recurse: yes
+        age_stamp: mtime
+      register: police_patrol_files
+      ignore_errors: yes
+
+    - name: Remove old Police_Patrol files
+      win_file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ police_patrol_files.files | default([]) }}"
+      when: police_patrol_files is succeeded
+      ignore_errors: yes
+
+    - name: Log cleanup completion
       win_shell: |
-        powershell.exe -ExecutionPolicy Bypass -File C:\Scripts\media_cleanup.ps1
-      register: cleanup_result
+        echo "Cleanup complete on {{ inventory_hostname }} - {{ ansible_date_time.date }} {{ ansible_date_time.time }}" >> C:\ansible_cleanup.log
+      ignore_errors: yes
 
-    # STEP 4: Display output
-    - name: Display cleanup output
-      debug:
-        msg: "{{ cleanup_result.stdout_lines }}"
-      when: cleanup_result.stdout_lines is defined
-
-    # STEP 5: Check logs
-    - name: Check if log file was created
-      win_stat:
-        path: 'C:\Logs'
-      register: log_dir
-
-    - name: Get latest log file content
+  handlers:
+    - name: log_error
       win_shell: |
-        Get-ChildItem -Path C:\Logs -Filter "cleanup_*.log" | 
-        Sort-Object LastWriteTime -Descending | 
-        Select-Object -First 1 | 
-        Get-Content -Tail 20
-      register: log_content
-      when: log_dir.stat.exists
-
-    - name: Display log tail
-      debug:
-        msg: "Latest log entries:\n{{ log_content.stdout }}"
-      when: log_content.stdout is defined
+        echo "Error occurred during cleanup on {{ inventory_hostname }} - {{ ansible_date_time.date }} {{ ansible_date_time.time }}" >> C:\ansible_cleanup_errors.log
+      listen: "cleanup_error"
